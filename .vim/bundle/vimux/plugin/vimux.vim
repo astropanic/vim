@@ -7,19 +7,66 @@ if !has("ruby")
   finish
 end
 
-command RunLastVimTmuxCommand :call RunLastVimTmuxCommand()
-command CloseVimTmuxPanes :call CloseVimTmuxPanes()
-command CloseVimTmuxWindows :call CloseVimTmuxWindows()
-command InspectVimTmuxRunner :call InspectVimTmuxRunner()
-command InterruptVimTmuxRunner :call InterruptVimTmuxRunner()
-command PromptVimTmuxCommand :call PromptVimTmuxCommand()
 
-function RunVimTmuxCommand(command)
+" New style commands with 'normalized' names
+command VimuxRunLastCommand :call VimuxRunLastCommand()
+command VimuxCloseRunner :call VimuxCloseRunner()
+command VimuxClosePanes :call VimuxClosePanes()
+command VimuxCloseWindows :call VimuxCloseWindows()
+command VimuxInspectRunner :call VimuxInspectRunner()
+command VimuxScrollUpInspect :call VimuxScrollUpInspect()
+command VimuxScrollDownInspect :call VimuxScrollDownInspect()
+command VimuxInterruptRunner :call VimuxInterruptRunner()
+command VimuxPromptCommand :call VimuxPromptCommand()
+command VimuxClearRunnerHistory :call VimuxClearRunnerHistory()
+
+" DEPRECATED
+command RunLastVimTmuxCommand :call VimuxRunLastCommand()
+command CloseVimTmuxRunner :call VimuxCloseRunner()
+command CloseVimTmuxPanes :call VimuxClosePanes()
+command CloseVimTmuxWindows :call VimuxCloseWindows()
+command InspectVimTmuxRunner :call VimuxInspectRunner()
+command InterruptVimTmuxRunner :call VimuxInterruptRunner()
+command PromptVimTmuxCommand :call VimuxPromptCommand()
+
+
+" new style functions
+function VimuxRunCommand(command, ...)
+  let l:autoreturn = 1
+
+  if exists("a:1")
+    let l:autoreturn = a:1
+  endif
+
   let g:_VimTmuxCmd = a:command
-  ruby CurrentTmuxSession.new.run_shell_command(Vim.evaluate("g:_VimTmuxCmd"))
+
+  if l:autoreturn == 1
+    ruby CurrentTmuxSession.new.run_shell_command(Vim.evaluate("g:_VimTmuxCmd"))
+  else
+    ruby CurrentTmuxSession.new.run_shell_command(Vim.evaluate("g:_VimTmuxCmd"), false)
+  endif
 endfunction
 
-function RunLastVimTmuxCommand()
+" deprecated!
+function RunVimTmuxCommand(command, ...)
+  " TODO replace me with the direct function call!
+  let l:autoreturn = 1
+
+  if exists("a:1")
+    let l:autoreturn = a:1
+  endif
+
+  let g:_VimTmuxCmd = a:command
+
+  if l:autoreturn == 1
+    ruby CurrentTmuxSession.new.run_shell_command(Vim.evaluate("g:_VimTmuxCmd"))
+  else
+    ruby CurrentTmuxSession.new.run_shell_command(Vim.evaluate("g:_VimTmuxCmd"), false)
+  endif
+endfunction
+
+
+function VimuxRunLastCommand()
   if exists("g:_VimTmuxCmd")
     ruby CurrentTmuxSession.new.run_shell_command(Vim.evaluate("g:_VimTmuxCmd"))
   else
@@ -27,34 +74,92 @@ function RunLastVimTmuxCommand()
   endif
 endfunction
 
-function ClearVimTmuxWindow()
+" deprecated!
+function RunLastVimTmuxCommand()
+  call VimuxRunLastCommand()
+endfunction
+
+
+function VimuxClearWindow()
   if exists("g:_VimTmuxRunnerPane")
     unlet g:_VimTmuxRunnerPane
   end
 endfunction
 
+" deprecated!
+function ClearVimTmuxWindow()
+  call VimuxClearWindow()
+endfunction
+
+
+" deprecated!
 function CloseVimTmuxWindows()
-  ruby CurrentTmuxSession.new.close_other_panes
-  call ClearVimTmuxWindow()
-  echoerr "CloseVimTmuxWindows is deprecated, use CloseVimTmuxPanes"
+  call VimuxCloseWindows()
 endfunction
 
+
+function VimuxCloseRunner()
+  ruby CurrentTmuxSession.new.close_runner_pane
+  call VimuxClearWindow()
+endfunction
+
+" deprecated!
+function CloseVimTmuxRunner()
+  call VimuxCloseRunner()
+endfunction
+
+
+function VimuxClosePanes()
+  ruby CurrentTmuxSession.new.close_other_panes
+  call VimuxClearWindow()
+endfunction
+
+" deprecated!
 function CloseVimTmuxPanes()
-  ruby CurrentTmuxSession.new.close_other_panes
-  call ClearVimTmuxWindow()
+  call VimuxClosePanes()
 endfunction
 
-function InterruptVimTmuxRunner()
+
+function VimuxInterruptRunner()
   ruby CurrentTmuxSession.new.interrupt_runner
 endfunction
 
-function InspectVimTmuxRunner()
+" deprecated!
+function InterruptVimTmuxRunner()
+  call VimuxInterruptRunner()
+endfunction
+
+function VimuxScrollDownInspect()
+  ruby CurrentTmuxSession.new.inspect_scroll_down
+endfunction
+
+function VimuxScrollUpInspect()
+  ruby CurrentTmuxSession.new.inspect_scroll_up
+endfunction
+
+function VimuxInspectRunner()
   ruby CurrentTmuxSession.new.inspect_runner
 endfunction
 
-function PromptVimTmuxCommand()
+" deprecated!
+function InspectVimTmuxRunner()
+  call VimuxInspectRunner()
+endfunction
+
+
+function VimuxPromptCommand()
   let l:command = input("Command? ")
-  call RunVimTmuxCommand(l:command)
+  call VimuxRunCommand(l:command)
+endfunction
+
+" deprecated!
+function PromptVimTmuxCommand()
+  call VimuxPromptCommand()
+endfunction
+
+
+function VimuxClearRunnerHistory()
+  ruby CurrentTmuxSession.new.clear_runner_history
 endfunction
 
 ruby << EOF
@@ -82,6 +187,10 @@ class TmuxSession
     Vim.command("unlet g:_VimTmuxRunnerPane")
   end
 
+  def clear_runner_history
+    _run("clear-history -t #{target(:pane => runner_pane)}")
+  end
+
   def height
     if Vim.evaluate('exists("g:VimuxHeight")') != 0
       Vim.evaluate('g:VimuxHeight')
@@ -98,17 +207,34 @@ class TmuxSession
     end
   end
 
+  def reset_sequence
+    if Vim.evaluate('exists("g:VimuxResetSequence")') != 0
+      "#{Vim.evaluate('g:VimuxResetSequence')}"
+    else
+      "q C-u"
+    end
+  end
+
   def inspect_runner
     _run("select-pane -t #{target(:pane => runner_pane)}")
     _run("copy-mode")
-    Vim.command("let g:_VimTmuxInspecting = 1")
+    _move_up_pane
   end
 
-  def stop_inspecting_runner
-    if Vim.evaluate('exists("g:_VimTmuxInspecting")') != 0
-      _run("send-keys -t #{target(:pane => runner_pane)} q")
-      Vim.command("unlet g:_VimTmuxInspecting")
-    end
+  def inspect_send_command(cmd)
+    t = target(:pane => runner_pane)
+    _run("select-pane -t #{t}")
+    _run("copy-mode")
+    _send_command(cmd, t, false)
+    _move_up_pane
+  end
+
+  def inspect_scroll_up
+    inspect_send_command("C-u")
+  end
+
+  def inspect_scroll_down
+    inspect_send_command("C-d")
   end
 
   def current_panes
@@ -129,7 +255,6 @@ class TmuxSession
 
   def runner_pane
     if @runner_pane.nil?
-      type = Vim.evaluate('exists("g:_VimTmuxInspecting")') != 0
       use_nearest_pane = Vim.evaluate('exists("g:VimuxUseNearestPane")') != 0
       if use_nearest_pane && nearest_inactive_pane_id
         _run("select-pane -t #{target(:pane => nearest_inactive_pane_id)}")
@@ -146,26 +271,31 @@ class TmuxSession
     end
 
     @runner_pane = nil
-    clear_vim_cached_runner_pane
     runner_pane
   end
 
   def interrupt_runner
-    stop_inspecting_runner
     _run("send-keys -t #{target(:pane => runner_pane)} ^c")
   end
 
-  def run_shell_command(command)
-    stop_inspecting_runner
-    _send_command(command, target(:pane => runner_pane))
+  def run_shell_command(command, auto_return = true)
+    reset_shell
+    _send_command(command, target(:pane => runner_pane), auto_return)
     _move_up_pane
   end
 
+  def close_runner_pane
+    _run("kill-pane -t #{target(:pane => runner_pane)}")
+  end
+
   def close_other_panes
-    stop_inspecting_runner
     if _run("list-panes").split("\n").length > 1
       _run("kill-pane -a")
     end
+  end
+
+  def reset_shell
+    _run("send-keys -t #{target(:pane => runner_pane)} #{reset_sequence}")
   end
 
   def nearest_inactive_pane_id
@@ -178,9 +308,9 @@ class TmuxSession
     _run("select-pane -t #{target}")
   end
 
-  def _send_command(command, target)
-    _run("send-keys -t #{target} '#{command.gsub("'", "\'")}'")
-    _run("send-keys -t #{target} Enter")
+  def _send_command(command, target, auto_return = true)
+    _run("send-keys -t #{target} \"#{command.gsub('"', '\"')}\"")
+    _run("send-keys -t #{target} Enter") if auto_return
   end
 
   def _run(command)
