@@ -8,7 +8,10 @@ git_bundles = [
   "git://github.com/benmills/vimux.git",
   "git://github.com/tpope/vim-rails.git",
   "git://github.com/vim-ruby/vim-ruby.git",
-  "git://github.com/tpope/vim-vividchalk.git"
+  "git://github.com/tpope/vim-vividchalk.git",
+  "git://github.com/vim-scripts/PreciseJump.git",
+  "git://github.com/ervandew/supertab.git"
+
 ]
 
 vim_org_scripts = []
